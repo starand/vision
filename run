@@ -1,0 +1,8 @@
+#!/bin/sh
+
+while :
+do
+    python3 /home/pi/src/vision/vision.py > /home/pi/src/vision/log 2>&1
+	echo "Restarting .."
+	sleep 5
+done

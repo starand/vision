@@ -7,7 +7,7 @@ from io import StringIO
 from config import tasksLink
 
 def getUrlContent(url):
-    response = requests.get(url)
+    response = requests.get(url, verify=False)
     if response.status_code == 200:
         return response.text
     return None
@@ -35,7 +35,7 @@ def getCurrencyInfo():
 
 def getCurrentTime():
     currentDT = datetime.datetime.now()
-    return "%d:%d" % (currentDT.hour, currentDT.minute)
+    return "%02d:%02d" % (currentDT.hour, currentDT.minute)
 
 def getWeatherInfo():
     weather = Weather()
@@ -43,7 +43,9 @@ def getWeatherInfo():
 
 def getTasksInfo():
     url = tasksLink
-    tasks = json.loads(getUrlContent(url))
+    content = getUrlContent(url)
+    if content is None: return 'No active tasks!'
+    tasks = json.loads(content)
 
     output = ''
     for task in tasks:
@@ -52,9 +54,10 @@ def getTasksInfo():
         desc = task['e_desc']
         time = task['e_time']
         output += "Task: %s: %s -- %s.\n" % (name, desc, time)
+
+    if len(output) == 0: output = 'No active tasks!'
         
     return output
 
-
 if __name__ == '__main__':
-    print(getWeatherInfo())
+    print(123)

@@ -11,5 +11,7 @@ def loadLastUpdateId(filename):
         with open(filename, 'r') as f:
             id = int(f.readline())
     except FileNotFoundError as e:
-        pass
+        print('File %s not found' % filename)
+    except ValueError as e:
+        print('last_id not found')
     return id

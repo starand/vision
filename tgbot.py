@@ -3,6 +3,7 @@ import requests
 import time
 import json
 import inspect
+import os
 
 import fileutils
 import config
@@ -12,10 +13,13 @@ class TelegramBot:
     _id_file = "last_id"
     _last_id = 0
     _cmd_registry = {}
+    _query_registry = {}
+    _path = ""
 
     def __init__(self, token):
+        _path = os.path.dirname(os.path.realpath(__file__))
         self._token = token
-        self._last_id = fileutils.loadLastUpdateId(self._id_file)
+        self._last_id = fileutils.loadLastUpdateId(_path + '/' + self._id_file)
         print("[Bot] started. Last update id: %s" % self._last_id)
 
     def getUpdates(self):
@@ -54,7 +58,7 @@ class TelegramBot:
         if not updates: return # netowrk issue
         status = updates['ok']
         if not status:
-            print("[Bot] Failed to parse updates json")
+                ("[Bot] Failed to parse updates json: " + str(updates))
         else:
             updates = updates['result']
             for update in updates: self.process(update)
@@ -62,9 +66,21 @@ class TelegramBot:
             if fileutils.loadLastUpdateId(self._id_file) != self._last_id:
                 fileutils.storeLastUpdateId(self._id_file, self._last_id)
 
+    def process_external_command(self):
+        response = requests.get(config.ext_cmd_url)
+        if response.status_code == 200 and len(response.text) > 0:
+            cmd = self._cmd_registry.get(response.text)
+            if cmd is not None:
+                name, desc, func, kb = cmd
+
+                message = dict(chat = dict(id = config.recepient))
+                self.sendMessage(config.recepient, func(message), kb)
+                print("[Bot] \'%s\' external command executed (%d)" % (name, self._last_id))
+
     def run(self):
         while True:
             self.process_updates()
+            self.process_external_command()
             time.sleep(1)
 
     def process(self, update):
@@ -79,7 +95,7 @@ class TelegramBot:
         
         query = update.get('callback_query')
         if query:
-            print(query)
+            self.process_query(query)
 
     ## process message from update
     def process_msg(self, message):
@@ -87,6 +103,17 @@ class TelegramBot:
         text = message['text']
         self.sendMessage(chat_id, "Hello " + text)
         print("[Bot] Processing message (%d): %s" % (self._last_id, text))
+
+    ## process query from bot
+    def process_query(self, query):
+        msg = query['message']
+        chat_id = msg['chat']['id']
+        data = query['data'][1:]
+        cmd = self._query_registry.get(data)
+        if cmd is not None:
+            name, desc, func, kb = cmd
+            self.sendMessage(chat_id, func(query), kb)
+            print("[Bot] \'%s\' query executed (%d)" % (name, self._last_id))
 
     ## process command from update
     def process_cmd(self, message):
@@ -105,6 +132,13 @@ class TelegramBot:
             self._cmd_registry[name] = (name, desc, func, kb)
             print("[Bot] \'%s\' comamnd added" % name)
 
+    ## add bot query handler
+    def register_query(self, name, desc, func, kb=None):
+        query = self._query_registry.get(name)
+        if query is None:
+            self._query_registry[name] = (name, desc, func, kb)
+            print("[Bot] \'%s\' query added" % name)
+
     def get_cmd_list(self):
         return self._cmd_registry.items()
 
@@ -116,3 +150,10 @@ def bot_command(function):
     kb = inspect.signature(function).parameters.get('kb')
     if (kb is not None): kb = kb.default
     bot.register_cmd(name, desc, function, kb)
+
+def bot_query(function):
+    name = function.__name__
+    desc = inspect.signature(function).parameters['desc'].default
+    kb = inspect.signature(function).parameters.get('kb')
+    if (kb is not None): kb = kb.default
+    bot.register_query(name, desc, function, kb)

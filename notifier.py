@@ -3,6 +3,7 @@ from tgbot import bot
 
 import time
 import utils
+import config
 
 class Notifier(Thread):
     _regularTimeNotifications = {}
@@ -12,10 +13,12 @@ class Notifier(Thread):
 
     def do_run(self):
         time = utils.getCurrentTime()
+        #print(time)
         for t in self._regularTimeNotifications:
+            #print(' -- %s' % t)
             if t == time:
                 for task in self._regularTimeNotifications[time]:
-                    bot.sendMessage('677743139', task())
+                    bot.sendMessage(config.recepient, task())
                     print("[%s] \'%s\' task executed" % (self._name, task.__name__))
         
     def add_daily_task(self, time, task):
